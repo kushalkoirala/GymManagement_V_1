@@ -6,6 +6,7 @@ import {
   serial,
 } from "drizzle-orm/pg-core";
 
+ 
 // Gym owners table
 export const usersTable = pgTable("users", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -25,3 +26,5 @@ export const clientsTable = pgTable("clients", {
     .notNull()
     .references(() => usersTable.id),
 });
+ 
+ 
