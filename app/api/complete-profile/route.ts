@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken"
+import jwt from "jsonwebtoken";
 import { db } from "@/drizzle/src";
 import { usersTable } from "@/drizzle/src/db/schema";
 import { eq } from "drizzle-orm";
@@ -8,8 +8,8 @@ const JWT_SECRET = process.env.JWT_TOKEN!;
 const COOKIE_DOMAIN = process.env.COOKIE_DOMAIN!;
 
 // REGEX VALIDATION RULES
-const nameRegex = /^[A-Za-z\s'-]+$/;  // letters, spaces, apostrophe, hyphen
-const phoneRegex = /^[0-9]{10}$/;     // Indian 10-digit format (common case)
+const nameRegex = /^[A-Za-z\s'-]+$/; // letters, spaces, apostrophe, hyphen
+const phoneRegex = /^[0-9]{10}$/; // Indian 10-digit format (common case)
 
 interface JwtUserPayload extends jwt.JwtPayload {
   id: number;
@@ -21,23 +21,19 @@ interface JwtUserPayload extends jwt.JwtPayload {
 }
 
 export async function POST(req: NextRequest) {
-    try {
-     
-     // 1. Read cookie
+  try {
+    // 1. Read cookie
 
-     const token = req.cookies.get("access-token")?.value;
+    const token = req.cookies.get("access-token")?.value;
 
-     if (!token) {
-      return NextResponse.json(
-        { message: "Token missing" },
-        { status: 401 }
-      );
+    if (!token) {
+      return NextResponse.json({ message: "Token missing" }, { status: 401 });
     }
 
-     // 2. Verify token
+    // 2. Verify token
     const decoded = jwt.verify(token, JWT_SECRET) as JwtUserPayload;
 
-     // 3. Read body data
+    // 3. Read body data
     const body = await req.json();
     const { firstName, lastName, phoneNumber } = body;
 
@@ -91,53 +87,52 @@ export async function POST(req: NextRequest) {
         first_name: firstName.toLowerCase(),
         last_name: lastName.toLowerCase(),
         phone_number: phoneNumber,
+        is_active: true,
       })
       .where(eq(usersTable.id, decoded.id))
       .returning();
 
     if (!updateUser) {
-      return NextResponse.json(
-        { message: "User not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ message: "User not found" }, { status: 404 });
     }
 
     // 5. Generate new token
     const jwtPayload = {
       id: decoded.id,
       email: decoded.email,
-      first_name: firstName,
-      last_name: lastName,
-      phone_number: phoneNumber,
+      first_name: updateUser[0].first_name,
+      last_name: updateUser[0].last_name,
+      phone_number: updateUser[0].phone_number,
+      is_active: updateUser[0].is_active,
     };
 
     const cookietoken = jwt.sign(jwtPayload, JWT_SECRET, { expiresIn: "30d" });
 
     // 6. Set cookie
-    const response = NextResponse.json({
-      message: "Profile updated successfully",
-      user: updateUser[0],
-    },{
-         status:201
-    });
-    response.cookies.set("token", cookietoken, {
-      name: "access-token",
-      value: cookietoken,
+    const response = NextResponse.json(
+      {
+        message: "Profile updated successfully",
+        user: updateUser[0],
+      },
+      {
+        status: 201,
+      }
+    );
+    
+    response.cookies.set("access-token", cookietoken, {
       httpOnly: true,
       secure: true,
       domain: COOKIE_DOMAIN,
       path: "/",
       maxAge: 60 * 60 * 24 * 30, // 30 days
     });
- 
+
     return response;
-
-    } catch (error) {
-        console.error("Error in complete-profile route:", error);
-        return NextResponse.json(
-            { message: "Internal server error" },
-            { status: 500 }
-          );
-
-    }
+  } catch (error) {
+    console.error("Error in complete-profile route:", error);
+    return NextResponse.json(
+      { message: "Internal server error" },
+      { status: 500 }
+    );
+  }
 }
