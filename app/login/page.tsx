@@ -91,7 +91,7 @@ const Page = () => {
             <div className="space-y-6">
               <button
                 onClick={handleGoogleLogin}
-                className="w-full flex items-center justify-center gap-3 bg-white border-2 border-gray-300 hover:border-gray-400 text-gray-700 font-semibold py-4 px-6 rounded-xl transition-all duration-300 hover:shadow-lg group"
+                className="w-full cursor-pointer flex items-center justify-center gap-3 bg-white border-2 border-gray-300 hover:border-gray-400 text-gray-700 font-semibold py-4 px-6 rounded-xl transition-all duration-300 hover:shadow-lg group"
               >
                 <FcGoogle className="text-2xl group-hover:scale-110 transition-transform duration-300" />
                 <span className="text-base md:text-lg">Sign in with Google</span>

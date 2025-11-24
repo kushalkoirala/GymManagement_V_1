@@ -7,20 +7,38 @@ export default function ClientsPage() {
   const [phone, setPhone] = useState("");
 
   async function addClient() {
-    await fetch("/api/clients", {
+    const res = await fetch("/api/client", {
       method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
         name,
         phone_number: phone,
       }),
     });
-    alert("Client added");
+
+    const data = await res.json();
+    console.log("Response:", data);
+
+    if (res.ok) alert("Client added!");
+    else alert("Error adding client");
   }
 
   return (
     <div>
-      <input placeholder="Name" onChange={(e) => setName(e.target.value)} />
-      <input placeholder="Phone" onChange={(e) => setPhone(e.target.value)} />
+      <input
+        placeholder="Name"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+      />
+
+      <input
+        placeholder="Phone"
+        value={phone}
+        onChange={(e) => setPhone(e.target.value)}
+      />
+
       <button onClick={addClient}>Add Client</button>
     </div>
   );
