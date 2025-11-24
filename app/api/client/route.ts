@@ -1,55 +1,76 @@
 import { NextResponse } from "next/server";
-import { db } from "@/db";
-import { clientsTable, usersTable } from "@/db/schema";
+import { db } from "@/drizzle/src";
+import { clientsTable, usersTable } from "@/drizzle/src/db/schema";
 import { eq } from "drizzle-orm";
 import { cookies } from "next/headers";
 
 export async function POST(req: Request) {
-  const body = await req.json();
-  const { name, phone_number } = body;
+  try {
+    const body = await req.json();
+    const { name, phone_number } = body;
 
-  const userEmail = cookies().get("userEmail")?.value;
+    // ⭐ FIX: cookies() must be awaited
+    const cookieStore = await cookies();
+    const userEmail = cookieStore.get("userEmail")?.value;
 
-  if (!userEmail) {
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    if (!userEmail) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
+    const owner = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.email, userEmail))
+      .limit(1);
+
+    const ownerData = owner[0];
+
+    if (!ownerData) {
+      return NextResponse.json({ error: "User not found" }, { status: 400 });
+    }
+
+    await db.insert(clientsTable).values({
+      name,
+      phone_number,
+      tenant_id: ownerData.id,
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error("POST /api/client error:", err);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
-
-  const owner = await db.query.usersTable.findFirst({
-    where: eq(usersTable.email, userEmail),
-  });
-
-  if (!owner) {
-    return NextResponse.json({ error: "User Not Found" }, { status: 404 });
-  }
-
-  await db.insert(clientsTable).values({
-    name,
-    phone_number,
-    tenant_id: owner.id,
-  });
-
-  return NextResponse.json({ success: true });
 }
 
 export async function GET() {
-  const userEmail = cookies().get("userEmail")?.value;
+  try {
+    const cookieStore = await cookies();
+    const userEmail = cookieStore.get("userEmail")?.value;
 
-  if (!userEmail) {
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    if (!userEmail) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
+    const owner = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.email, userEmail))
+      .limit(1);
+
+    const ownerData = owner[0];
+
+    if (!ownerData) {
+      return NextResponse.json([], { status: 200 });
+    }
+
+    const clients = await db
+      .select()
+      .from(clientsTable)
+      .where(eq(clientsTable.tenant_id, ownerData.id));
+
+    return NextResponse.json(clients);
+  } catch (err) {
+    console.error("GET /api/client error:", err);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
-
-  const owner = await db.query.usersTable.findFirst({
-    where: eq(usersTable.email, userEmail),
-  });
-
-  if (!owner) {
-    return NextResponse.json({ error: "User Not Found" }, { status: 404 });
-  }
-
-  const clients = await db
-    .select()
-    .from(clientsTable)
-    .where(eq(clientsTable.tenant_id, owner.id));
-
-  return NextResponse.json(clients);
 }
