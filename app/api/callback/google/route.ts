@@ -93,9 +93,7 @@ export async function GET(req: NextRequest) {
 
     if (!isProfileComplete) {
       const response = NextResponse.redirect(`${BASE_URL}/complete-profile`);
-      response.cookies.set("token", token, {
-        name: "access-token",
-        value: token,
+      response.cookies.set("access-token", token, {
         httpOnly: true,
         secure: true,
         domain: COOKIE_DOMAIN,
@@ -105,9 +103,7 @@ export async function GET(req: NextRequest) {
       return response;
     } else {
       const response = NextResponse.redirect(`${BASE_URL}/dashboard`);
-      response.cookies.set("token", token, {
-        name: "access-token",
-        value: token,
+      response.cookies.set("access-token", token, {
         httpOnly: true,
         secure: true,
         domain: COOKIE_DOMAIN,
