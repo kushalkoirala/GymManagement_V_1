@@ -1,76 +1,117 @@
-import { NextResponse } from "next/server";
-import { db } from "@/drizzle/src";
-import { clientsTable, usersTable } from "@/drizzle/src/db/schema";
-import { eq } from "drizzle-orm";
 import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
+import { Client, Databases, ID } from "node-appwrite";
+import jwt from "jsonwebtoken";
 
-export async function POST(req: Request) {
+// -------------------------------
+// Decode user from JWT
+// -------------------------------
+async function getUserFromJWT() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("access-token")?.value;
+
+  if (!token) return null;
+
   try {
-    const body = await req.json();
-    const { name, phone_number } = body;
-
-    // ⭐ FIX: cookies() must be awaited
-    const cookieStore = await cookies();
-    const userEmail = cookieStore.get("userEmail")?.value;
-
-    if (!userEmail) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-    }
-
-    const owner = await db
-      .select()
-      .from(usersTable)
-      .where(eq(usersTable.email, userEmail))
-      .limit(1);
-
-    const ownerData = owner[0];
-
-    if (!ownerData) {
-      return NextResponse.json({ error: "User not found" }, { status: 400 });
-    }
-
-    await db.insert(clientsTable).values({
-      name,
-      phone_number,
-      tenant_id: ownerData.id,
-    });
-
-    return NextResponse.json({ success: true });
-  } catch (err) {
-    console.error("POST /api/client error:", err);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
+    return decoded as {
+      userId: string;
+      email: string;
+      name?: string;
+      picture?: string;
+    };
+  } catch {
+    return null;
   }
 }
 
+// -------------------------------
+// Appwrite Client Setup
+// -------------------------------
+function appwrite() {
+  const client = new Client()
+    .setEndpoint(process.env.APPWRITE_ENDPOINT!)
+    .setProject(process.env.APPWRITE_PROJECT_ID!)
+    .setKey(process.env.APPWRITE_API_KEY!);
+
+  const databases = new Databases(client);
+
+  return { databases };
+}
+
+// -------------------------------
+// GET: Fetch all clients
+// -------------------------------
 export async function GET() {
   try {
-    const cookieStore = await cookies();
-    const userEmail = cookieStore.get("userEmail")?.value;
-
-    if (!userEmail) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    const user = await getUserFromJWT();
+    if (!user) {
+      return NextResponse.json(
+        { error: "Unauthorized: Invalid or missing token" },
+        { status: 401 }
+      );
     }
 
-    const owner = await db
-      .select()
-      .from(usersTable)
-      .where(eq(usersTable.email, userEmail))
-      .limit(1);
+    const { databases } = appwrite();
 
-    const ownerData = owner[0];
+    const clients = await databases.listDocuments(
+      process.env.APPWRITE_DATABASE_ID!,
+      process.env.APPWRITE_CLIENT_COLLECTION_ID!,
+      [
+        // Filter by logged-in user
+        // Query.equal("userId", user.userId)
+      ]
+    );
 
-    if (!ownerData) {
-      return NextResponse.json([], { status: 200 });
+    return NextResponse.json({ success: true, data: clients });
+  } catch (error: any) {
+    return NextResponse.json(
+      { error: error.message || "Server error" },
+      { status: 500 }
+    );
+  }
+}
+
+// -------------------------------
+// POST: Create a client
+// -------------------------------
+export async function POST(req: Request) {
+  try {
+    const user = await getUserFromJWT();
+    if (!user) {
+      return NextResponse.json(
+        { error: "Unauthorized: Invalid or missing token" },
+        { status: 401 }
+      );
     }
 
-    const clients = await db
-      .select()
-      .from(clientsTable)
-      .where(eq(clientsTable.tenant_id, ownerData.id));
+    const { name, phone } = await req.json();
 
-    return NextResponse.json(clients);
-  } catch (err) {
-    console.error("GET /api/client error:", err);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    if (!name || !phone) {
+      return NextResponse.json(
+        { error: "Name and phone are required" },
+        { status: 400 }
+      );
+    }
+
+    const { databases } = appwrite();
+
+    const doc = await databases.createDocument(
+      process.env.APPWRITE_DATABASE_ID!,
+      process.env.APPWRITE_CLIENT_COLLECTION_ID!,
+      ID.unique(),
+      {
+        name,
+        phone,
+        userId: user.userId, // Save logged-in user reference
+      }
+    );
+
+    return NextResponse.json({ success: true, data: doc }, { status: 201 });
+  } catch (error: any) {
+    return NextResponse.json(
+      { error: error.message || "Server error" },
+      { status: 500 }
+    );
   }
 }
