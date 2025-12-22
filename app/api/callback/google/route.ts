@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
     }
 
     // 3. Save into database
-
+    
     const insertUser = await db
       .insert(usersTable)
       .values({
@@ -87,6 +87,7 @@ export async function GET(req: NextRequest) {
       last_name: user.last_name,
       phone_number: user.phone_number,
       is_active: user.is_active,
+      role: user.role,
     };
 
     const token = jwt.sign(jwtPayload, JWT_SECRET, { expiresIn: "30d" });
