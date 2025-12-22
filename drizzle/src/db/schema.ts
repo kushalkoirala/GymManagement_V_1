@@ -3,9 +3,10 @@ import {
   integer,
   pgTable,
   varchar,
-  serial,
+  // serial,
   timestamp,
-  pgEnum
+  pgEnum,
+  bigserial,
 } from "drizzle-orm/pg-core";
 
 /* User roles */
@@ -13,6 +14,7 @@ export const userRoleEnum = pgEnum("user_role", [
   "SUPER_ADMIN",
   "GYM_OWNER",
   "GYM_STAFF",
+  "GYM_CLIENT",
 ]);
 
 export const usersTable = pgTable("users", {
@@ -21,11 +23,12 @@ export const usersTable = pgTable("users", {
   first_name: varchar("first_name", { length: 255 }),
   last_name: varchar("last_name", { length: 255 }),
   phone_number: varchar("phone_number", { length: 20 }),
-  role: userRoleEnum("role").notNull(),
+
+  role: userRoleEnum("role").notNull().default("GYM_OWNER"), // default for normal users
+
   is_active: boolean("is_active").notNull().default(true),
   created_at: timestamp("created_at").defaultNow().notNull(),
 });
-
 
 export const gymsTable = pgTable("gyms", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -41,15 +44,15 @@ export const gymsTable = pgTable("gyms", {
 });
 
 export const clientsTable = pgTable("clients", {
-  id: serial("id").primaryKey(),
-
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   gym_id: integer("gym_id")
     .notNull()
     .references(() => gymsTable.id, { onDelete: "cascade" }),
 
   name: varchar("name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 255 }).notNull().unique(),
   phone_number: varchar("phone_number", { length: 20 }),
-
+  role: userRoleEnum("role").notNull().default("GYM_CLIENT"),
   is_active: boolean("is_active").notNull().default(true),
   created_at: timestamp("created_at").defaultNow().notNull(),
 });
